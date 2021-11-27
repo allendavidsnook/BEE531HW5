@@ -103,22 +103,22 @@ for ln = 1:128 % reconstruct a line per element
     for ele=1:128 % first_piezo:last_piezo
       % calculate time shifted rf at this depth contributed by each transmitting element
       shifted_depth = dep + round(shift(ele));
-      rf_shift(dep, ele) = rf_pad(shifted_depth, ele);
+      rf_shifted(dep, ele) = rf_pad(shifted_depth, ele);
       % NOT USED shift_see(dep,ele)  = shift(ele);
     end
   end
 
-  % lastly, sum all the contributions
+  % lastly, sum all the contributions for this receive line
   % sum(x, 2) returns a column vector containing the sum of each row
-  bmode(:,ln) = sum(rf_shift,2);
+  rf_summed(:,ln) = sum(rf_shifted,2);
 end
 
 % complex -> magnitude
-bmode = abs(bmode);
+env = abs(rf_summed);
 
-% log compress it
-bmode_image_log_compressed = 20*log10(bmode)
+% log compress it and display it
+env_log_compressed = 20*log10(env)
 figure(36);
-imagesc(bmode_image_log_compressed);
+imagesc(env_log_compressed);
 colormap(gray);
 caxis([30 78])
