@@ -13,61 +13,91 @@ txdel = zeros(1,128); % transmit delays
 param.fs = 4*param.fc; % sampling frequency
 opt.ElementSplitting = 1; % to make simulations faster
 
-param.movie = [5 3];
-[F,info] = mkmovie(xs,zs,RC,txdel,param,'l11-5v_2.gif');
 
-figure;colormap([1-hot(128); hot(128)]);
-framenum = round(linspace(1,size(F,3),9));
-file = 'L11-5v_.gif'
-for k = 1:1000
-    image(info.Xgrid*100,info.Zgrid*100,1.0*F(:,:,k))
-    hold on
-    scatter(xs*100,zs*100,10,'w','filled')
-    hold off
-    axis equal ij tight
-    title([int2str(info.TimeStep*k*1e6) ' \mus'])
-    ylabel('[cm]')
-    xlabel('[cm]')
-    set(gca,'box','off')
-    snapnow
-    frame(k) = getframe(gcf);
-    %pause(.1)
+% Save time - don't generate the movie over and over again
+make_movie = 0;
+
+if make_movie == 1
+    param.movie = [5 3];
+    [F,info] = mkmovie(xs,zs,RC,txdel,param,'l11-5v_2.gif');
+
+    figure;colormap([1-hot(128); hot(128)]);
+    framenum = round(linspace(1,size(F,3),9));
+    file = 'L11-5v_.gif'
+    for k = 1:1000 % k is the frame number in the roughly 47 sec long movie this creates
+        image(info.Xgrid*100,info.Zgrid*100,1.0*F(:,:,k))
+        hold on
+        scatter(xs*100,zs*100,10,'w','filled')
+        hold off
+        axis equal ij tight
+        title([int2str(info.TimeStep*k*1e6) ' \mus'])
+        ylabel('[cm]')
+        xlabel('[cm]')
+        set(gca,'box','off')
+        snapnow
+        frame(k) = getframe(gcf);
+        %pause(.1)
+    end
+
+    vid = VideoWriter(['test_2.avi']);
+    vid.FrameRate = 20;
+    open(vid)
+    writeVideo(vid,frame);
+    close(vid);
 end
-
-vid = VideoWriter(['test_2.avi']);
-vid.FrameRate = 20;
-open(vid)
-writeVideo(vid,frame);
-close(vid);
 
 %% Beamform
 %% Generate RF
+%% simus takes
+%%% the xs and zs position of the scatterers,
+%%% the RC?
+%%% the transmit delays (all zeros for this plane wave)
+%%% the transducer parameters (e.g. center frequency, pitch, number of
+%%% elements
+%%% any other options (e.g. enable element splitting)
 RF = simus(xs,zs,RC,txdel,param,opt);
 
-xc = ((0:127)-63-0.5).*param.pitch;
-fs = param.fs;
-c = 1540;
-dz = c/(2*fs);
+xc = ((0:127)-63-0.5).*param.pitch; % -0.019 to +0.019 m
+fs = param.fs; % 30,400,000 samp/s
+c = 1540; % m/s
+dz = c/(2*fs); % dz = 25 um
 
 for ln = 1:128 % reconstruct a line per element
   x_ca = xc(ln); % x-axis (along transducer face) location of reconstructed line
+
+  % copy the RF data (1100x128) and pad it out to 1600x128
   rf_pad     = [RF; zeros(500,128) ]; % extra pad for shifts at bottom of image
 
+  temp = zeros(1100,128);
+
+  % calculate the delay
   for id = 0:(1100-1)
-      z = id .* dz;
+      z = id .* dz; % z will vary from 0 when id=0 to
       % Calculate num samples to shift from position of tstart
-      temp(id+1,:) % = you insert code here to calculate the delay matrix
+      temp(id+1,:) = zeros(1, 128); % = you insert code here to calculate the delay matrix
   end
 
+  % apply the delay
   for dep = 1:1100
     shift = temp(dep,:); % take delays for depth depth
     for ele=1:128 % first_piezo:last_piezo
-      rf_shift(dep,ele)   = rf_pad(dep+round(shift(ele)),ele);
-      shift_see(dep,ele)  = shift(ele);
+      % calculate time shifted rf at this depth contributed by each transducer element
+      rf_shift(dep,ele) = rf_pad(dep+round(shift(ele)),ele);
+      % NOT USED shift_see(dep,ele)  = shift(ele);
     end
   end
+
+  % lastly, sum all the contributions
+  % sum(x, 2) returns a column vector containing the sum of each row
   bmode(:,ln) = sum(rf_shift,2);
 end
 
-%%%% figure(36);imagesc(20*log10(abs(%insert envelope signal here% )));colormap(gray);
+% complex -> magnitude
+bmode = abs(bmode);
+
+% log compress it
+bmode_image_log_compressed = 20*log10(bmode)
+figure(36);
+imagesc(bmode_image_log_compressed);
+colormap(gray);
 caxis([30 78])
