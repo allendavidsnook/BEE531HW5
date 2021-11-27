@@ -65,24 +65,45 @@ dz = c/(2*fs); % dz = 25 um
 for ln = 1:128 % reconstruct a line per element
   x_ca = xc(ln); % x-axis (along transducer face) location of reconstructed line
 
-  % copy the RF data (1100x128) and pad it out to 1600x128
-  rf_pad     = [RF; zeros(500,128) ]; % extra pad for shifts at bottom of image
+  % copy the RF data (1100x128) and pad it out to 1900x128
+  rf_pad     = [RF; zeros(800,128) ]; % extra pad for shifts at bottom of image
 
   temp = zeros(1100,128);
 
-  % calculate the delay
+  % for the line we are receiving on
+  % calculate the additional delay we need to shift by
   for id = 0:(1100-1)
       z = id .* dz; % z will vary from 0 when id=0 to
       % Calculate num samples to shift from position of tstart
-      temp(id+1,:) = zeros(1, 128); % = you insert code here to calculate the delay matrix
+      % temp(depth, element) contains the delay for that depth
+      % calculate the delay matrix
+      % as a row vector with one column per transmitting element
+      for tx_element_index = 1:128
+          % we are listening on rx element ln at position x_ca
+          % the echo from depth z below tx element tx_element_index will be
+          % delayed to the rx element ln by an amount we need to calculate
+
+          % first, calculate the distance between the tx and rx elements
+          x_sep_tx_rx = abs(x_ca - xc(tx_element_index));
+          % then calculate the total distance from that depth below the tx
+          % element all the way back to the rx element
+          total_distance = sqrt(x_sep_tx_rx * x_sep_tx_rx + z * z);
+          % subtract out the z depth
+          delta_distance = total_distance - z;
+          % discretize it to index into the pad correctly
+          delay = delta_distance / dz;
+          temp(id+1,tx_element_index) = delay;
+      end
   end
 
-  % apply the delay
+  % apply the delay to the received signal
   for dep = 1:1100
     shift = temp(dep,:); % take delays for depth depth
+    % iterate over each transmit element
     for ele=1:128 % first_piezo:last_piezo
-      % calculate time shifted rf at this depth contributed by each transducer element
-      rf_shift(dep,ele) = rf_pad(dep+round(shift(ele)),ele);
+      % calculate time shifted rf at this depth contributed by each transmitting element
+      shifted_depth = dep + round(shift(ele));
+      rf_shift(dep, ele) = rf_pad(shifted_depth, ele);
       % NOT USED shift_see(dep,ele)  = shift(ele);
     end
   end
