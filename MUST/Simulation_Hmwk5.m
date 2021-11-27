@@ -62,6 +62,8 @@ fs = param.fs; % 30,400,000 samp/s
 c = 1540; % m/s
 dz = c/(2*fs); % dz = 25 um
 
+rf_shifted = zeros(1100, 128);
+
 for ln = 1:128 % reconstruct a line per element
   x_ca = xc(ln); % x-axis (along transducer face) location of reconstructed line
 
@@ -73,7 +75,7 @@ for ln = 1:128 % reconstruct a line per element
   % for the line we are receiving on
   % calculate the additional delay we need to shift by
   for id = 0:(1100-1)
-      z = id .* dz; % z will vary from 0 when id=0 to
+      z = id .* dz; % z will vary from 0 when id=0 to 0.0279 m when id=1100
       % Calculate num samples to shift from position of tstart
       % temp(depth, element) contains the delay for that depth
       % calculate the delay matrix
@@ -83,7 +85,7 @@ for ln = 1:128 % reconstruct a line per element
           % the echo from depth z below tx element tx_element_index will be
           % delayed to the rx element ln by an amount we need to calculate
 
-          % first, calculate the distance between the tx and rx elements
+          % first, calculate the distance between the rx and tx elements
           x_sep_tx_rx = abs(x_ca - xc(tx_element_index));
           % then calculate the total distance from that depth below the tx
           % element all the way back to the rx element
@@ -110,15 +112,44 @@ for ln = 1:128 % reconstruct a line per element
 
   % lastly, sum all the contributions for this receive line
   % sum(x, 2) returns a column vector containing the sum of each row
-  rf_summed(:,ln) = sum(rf_shifted,2);
+  RF_beamformed(:,ln) = sum(rf_shifted,2);
 end
 
+%% FIGURE 5 - RF unshifted
 % complex -> magnitude
-env = abs(rf_summed);
-
+env = abs(RF);
 % log compress it and display it
-env_log_compressed = 20*log10(env)
-figure(36);
+env_log_compressed = 20*log10(env);
+figure(5);
 imagesc(env_log_compressed);
 colormap(gray);
 caxis([30 78])
+title('Figure 5 - RF signal, unflattened');
+xlabel("Transducer Element");
+ylabeltext = sprintf('Depth / %0.2e m', dz);
+ylabel(ylabeltext);
+
+%% FIGURE 6 - RF shifted
+% complex -> magnitude
+env_shifted = abs(rf_shifted);
+% log compress it and display it
+env_shifted_log_compressed = 20*log10(env_shifted);
+figure(6);
+imagesc(env_shifted_log_compressed);
+colormap(gray);
+caxis([30 78])
+title('Figure 6 - RF signal, flattened');
+xlabel("Transducer Element");
+ylabeltext = sprintf('Depth / %0.2e m', dz);
+ylabel(ylabeltext);
+
+%% FIGURE 8 - Beamformed Bmode
+% complex -> magnitude
+env_beamformed = abs(RF_beamformed);
+% log compress it and display it
+env_beamformed_log_compressed = 20*log10(env_beamformed);
+figure(8);
+imagesc(env_beamformed_log_compressed);
+colormap(gray);
+caxis([30 78])
+title("Figure 8 - Bmode Image");
