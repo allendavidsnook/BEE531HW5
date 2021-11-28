@@ -159,6 +159,18 @@ xlabel("Transducer Element");
 ylabeltext = sprintf('Depth / %0.2e m', dz);
 ylabel(ylabeltext);
 
+%% FIGURE 7 - Line 64 Beamformed
+% complex -> magnitude
+line_64_env_beamformed = abs(RF_beamformed(:, 64));
+% log compress it and display it
+line_64_env_beamformed_log_compressed = 20*log10(line_64_env_beamformed);
+figure(7);
+plot(line_64_env_beamformed_log_compressed);
+xlabeltext = sprintf('Depth / %0.2e m', dz);
+xlabel(xlabeltext);
+ylabel("Envelope, dB");
+title("Figure 7 - Line 64 Bmode");
+
 %% FIGURE 8 - Beamformed Bmode
 % complex -> magnitude
 env_beamformed = abs(RF_beamformed);
@@ -169,3 +181,6 @@ imagesc(env_beamformed_log_compressed);
 colormap(gray);
 caxis([30 78])
 title("Figure 8 - Bmode Image");
+xlabel("Transducer Element");
+ylabeltext = sprintf('Depth / %0.2e m', dz);
+ylabel(ylabeltext);
