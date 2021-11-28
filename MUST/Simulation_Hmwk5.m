@@ -62,7 +62,9 @@ fs = param.fs; % 30,400,000 samp/s
 c = 1540; % m/s
 dz = c/(2*fs); % dz = 25 um
 
-rf_shifted = zeros(1100, 128);
+line_64_rf_shifted = zeros(1100, 128);
+
+line_64_delay_matrix = zeros(1100,128);
 
 for ln = 1:128 % reconstruct a line per element
   x_ca = xc(ln); % x-axis (along transducer face) location of reconstructed line
@@ -93,9 +95,13 @@ for ln = 1:128 % reconstruct a line per element
           % subtract out the z depth
           delta_distance = total_distance - z;
           % discretize it to index into the pad correctly
-          delay = delta_distance / dz;
+          delay = delta_distance / dz / 2;
           temp(id+1,tx_element_index) = delay;
       end
+  end
+
+  if ln == 64
+      line_64_delay_matrix = temp;
   end
 
   % apply the delay to the received signal
@@ -110,10 +116,20 @@ for ln = 1:128 % reconstruct a line per element
     end
   end
 
+  if ln == 64
+      line_64_rf_shifted = rf_shifted
+  end
+
   % lastly, sum all the contributions for this receive line
   % sum(x, 2) returns a column vector containing the sum of each row
   RF_beamformed(:,ln) = sum(rf_shifted,2);
 end
+
+%% FIGURE X - Delay Matrix for Line 64
+figure(4);
+imagesc(line_64_delay_matrix);
+title('Line 64 Delay Matrix');
+colorbar;
 
 %% FIGURE 5 - RF unshifted
 % complex -> magnitude
@@ -131,11 +147,11 @@ ylabel(ylabeltext);
 
 %% FIGURE 6 - RF shifted
 % complex -> magnitude
-env_shifted = abs(rf_shifted);
+line_64_env_shifted = abs(line_64_rf_shifted);
 % log compress it and display it
-env_shifted_log_compressed = 20*log10(env_shifted);
+line_64_env_shifted_log_compressed = 20*log10(line_64_env_shifted);
 figure(6);
-imagesc(env_shifted_log_compressed);
+imagesc(line_64_env_shifted_log_compressed);
 colormap(gray);
 caxis([30 78])
 title('Figure 6 - RF signal, flattened');
