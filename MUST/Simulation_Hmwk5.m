@@ -5,14 +5,13 @@
 param = getparam('L11-5V');
 
 % Define scatterers
-xs = [ 0 0 ].* 1e-2;
-zs = [ 1 2 ].* 1e-2;
-RC = [ 1 1 ];
+xs = [ 0 0 ].* 1e-2; % x coords of each of two scatterers
+zs = [ 1 2 ].* 1e-2; % z coords of each of two scatterers
+RC = [ 1 1 ]; % reflection coefficients of each of two scatterers
 
-txdel = zeros(1,128); % transmit delays
-param.fs = 4*param.fc; % sampling frequency
+txdel = zeros(1,128); % transmit delays - all zero == plane wave
+param.fs = 4*param.fc; % sampling frequency (choose 4x tx frequency for great glory
 opt.ElementSplitting = 1; % to make simulations faster
-
 
 % Save time - don't generate the movie over and over again
 make_movie = 0;
@@ -57,6 +56,11 @@ end
 %%% any other options (e.g. enable element splitting)
 RF = simus(xs,zs,RC,txdel,param,opt);
 
+% This will generate a 1100r x 128c RF matrix
+% Let's export it
+
+
+
 xc = ((0:127)-63-0.5).*param.pitch; % -0.019 to +0.019 m
 fs = param.fs; % 30,400,000 samp/s
 c = 1540; % m/s
@@ -66,17 +70,23 @@ line_64_rf_shifted = zeros(1100, 128);
 
 line_64_delay_matrix = zeros(1100,128);
 
+% copy the RF data (1100x128) and pad it out to 1900x128
+rf_pad     = [RF; zeros(800,128) ]; % extra pad for shifts at bottom of image
+
 for ln = 1:128 % reconstruct a line per element
   x_ca = xc(ln); % x-axis (along transducer face) location of reconstructed line
 
-  % copy the RF data (1100x128) and pad it out to 1900x128
-  rf_pad     = [RF; zeros(800,128) ]; % extra pad for shifts at bottom of image
-
+  % we'll calculate a delays matrix (temp) for the current rx element
+  % we need to calculate the correct delay for each depth (1100 rows) from each
+  % possible tx element (128 columns)
+  % so, temp contains 1100 rows and 128 columns
   temp = zeros(1100,128);
 
   % for the line we are receiving on
   % calculate the additional delay we need to shift by
   for id = 0:(1100-1)
+      % z will hold the depth that we are evaluating, which is a function
+      % of id
       z = id .* dz; % z will vary from 0 when id=0 to 0.0279 m when id=1100
       % Calculate num samples to shift from position of tstart
       % temp(depth, element) contains the delay for that depth
@@ -92,11 +102,11 @@ for ln = 1:128 % reconstruct a line per element
           % then calculate the total distance from that depth below the tx
           % element all the way back to the rx element
           total_distance = sqrt(x_sep_tx_rx * x_sep_tx_rx + z * z);
-          % subtract out the z depth
+          % subtract out the z depth so we just get the delta we need
           delta_distance = total_distance - z;
           % discretize it to index into the pad correctly
           delay = delta_distance / dz / 2;
-          temp(id+1,tx_element_index) = delay;
+          temp(id+1,tx_element_index) = delay; % save the delta for the given depth
       end
   end
 
@@ -105,8 +115,8 @@ for ln = 1:128 % reconstruct a line per element
   end
 
   % apply the delay to the received signal
-  for dep = 1:1100
-    shift = temp(dep,:); % take delays for depth depth
+  for dep = 1:1100 % for each discrete depth
+    shift = temp(dep,:); % grab the delays for this depth
     % iterate over each transmit element
     for ele=1:128 % first_piezo:last_piezo
       % calculate time shifted rf at this depth contributed by each transmitting element
